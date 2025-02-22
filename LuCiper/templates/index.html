@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lattice-based AES Encryption and Decryption</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        table {
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            width: 100%;
+            table-layout: fixed;
+            word-wrap: break-word;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 5px;
+            text-align: center;
+            font-size: 12px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        textarea {
+            width: 100%;
+            font-size: 14px;
+            padding: 10px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+    </style>
+    <script>
+        let aesKey = '';
+
+        // Function to generate a table from an array
+        function generateTable(array, columns = 16) {
+            let table = '<table><tr>';
+            for (let i = 0; i < array.length; i++) {
+                table += `<td>${array[i]}</td>`;
+                if ((i + 1) % columns === 0 && i !== array.length - 1) {
+                    table += '</tr><tr>';
+                }
+            }
+            table += '</tr></table>';
+            return table;
+        }
+
+        // Function to display arrays as tables
+        function displayArrayAsTable(key, array) {
+            const tableKeys = [
+                'ciphertext',
+                'nonce',
+                'sbox',
+                'sbox_applied',
+                'transformed_bytes',
+                'decoded_data',
+                'decrypted_sbox_bytes',
+                'reverse_sbox_applied',
+                'tag',
+                'message_hash',
+                'plaintext_with_hash',
+                'transformed_plaintext',
+                'original_message_with_hash',
+                'received_hash',
+                'computed_hash',
+                'hash_verified'
+            ];
+
+            if (tableKeys.includes(key) && Array.isArray(array)) {
+                return generateTable(array);
+            } else {
+                return `<pre>${JSON.stringify(array, null, 2)}</pre>`;
+            }
+        }
+
+        // Function to display encryption details in the correct order
+        function displayEncryptionDetails(details) {
+            const detailOrder = [
+                'message_hash',
+                'plaintext_with_hash',
+                'sbox',
+                'transformed_plaintext',
+                'transformed_bytes',
+                'sbox_applied',
+                'nonce',
+                'ciphertext',
+                'tag',
+                'final_ciphertext'
+            ];
+
+            let detailsHtml = '<h3>Encryption Details:</h3>';
+            detailOrder.forEach(key => {
+                if (details[key] !== undefined) {
+                    detailsHtml += `<h4>${capitalizeFirstLetter(key)}:</h4>`;
+                    detailsHtml += `<div class="table-container">${displayArrayAsTable(key, details[key])}</div>`;
+                }
+            });
+            document.getElementById('encryption-details').innerHTML = detailsHtml;
+        }
+
+        // Function to display decryption details in the correct order
+        function displayDecryptionDetails(details) {
+            const detailOrder = [
+                'nonce',
+                'tag',
+                'ciphertext',
+                'decrypted_sbox_bytes',
+                'sbox',
+                'reverse_sbox_applied',
+                'transformed_plaintext',
+                'original_message_with_hash',
+                'received_hash',
+                'computed_hash',
+                'hash_verified'
+            ];
+
+            let detailsHtml = '<h3>Decryption Details:</h3>';
+            detailOrder.forEach(key => {
+                if (details[key] !== undefined) {
+                    detailsHtml += `<h4>${capitalizeFirstLetter(key)}:</h4>`;
+                    detailsHtml += `<div class="table-container">${displayArrayAsTable(key, details[key])}</div>`;
+                }
+            });
+            document.getElementById('decryption-details').innerHTML = detailsHtml;
+        }
+
+        // Utility function to capitalize the first letter
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+
+        async function getKey() {
+            const response = await fetch('/key_exchange');
+            const result = await response.json();
+            aesKey = result.key; // Use the base64-encoded AES key from the response
+            document.getElementById('aes-key').textContent = aesKey;
+        }
+
+        async function sendMessage() {
+            if (!aesKey) {
+                await getKey();
+            }
+            const message = document.getElementById('message').value;
+            const response = await fetch('/encrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ aes_key: aesKey, message: message })
+            });
+            const result = await response.json();
+            document.getElementById('ciphertext').textContent = result.ciphertext;
+            displayEncryptionDetails(result.details);
+        }
+
+        async function decryptMessage() {
+            if (!aesKey) {
+                await getKey();
+            }
+            const ciphertext = document.getElementById('ciphertext').textContent;
+            const response = await fetch('/decrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ aes_key: aesKey, ciphertext: ciphertext })
+            });
+            const result = await response.json();
+            document.getElementById('decrypted').textContent = result.plaintext;
+            displayDecryptionDetails(result.details);
+        }
+
+        // Initialize the AES key on page load
+        window.onload = function() {
+            getKey();
+        };
+    </script>
+</head>
+<body>
+    <h1>Lattice-based AES Encryption and Decryption</h1>
+    
+    <!-- AES Key Section -->
+    <div>
+        <h2>AES Key:</h2>
+        <pre id="aes-key"></pre>
+        <button onclick="getKey()">Generate New Key</button>
+    </div>
+    
+    <!-- Message Input Section -->
+    <div>
+        <textarea id="message" rows="4" placeholder="Enter your message here..."></textarea><br>
+        <button onclick="sendMessage()">Encrypt</button>
+    </div>
+
+    <!-- Encryption Details Section -->
+    <div id="encryption-details"></div>
+
+    <!-- Ciphertext Section -->
+    <div>
+        <h2>Ciphertext:</h2>
+        <pre id="ciphertext"></pre>
+        <button onclick="decryptMessage()">Decrypt</button>
+    </div>
+
+    <!-- Decryption Details Section -->
+    <div id="decryption-details"></div>
+
+    <!-- Decrypted Message Section -->
+    <div>
+        <h2>Decrypted Message:</h2>
+        <pre id="decrypted"></pre>
+    </div>
+</body>
+</html>
